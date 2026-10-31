@@ -10,6 +10,7 @@ import Today from './pages/Today'
 import Goals from './pages/Goals'
 import Diary from './pages/Diary'
 import Knowledge from './pages/Knowledge'
+import Books from './pages/Books'
 import Charts from './pages/Charts'
 import Profile from './pages/Profile'
 import DataCenter from './pages/DataCenter'
@@ -19,6 +20,7 @@ const NAV = [
   { to: '/goals', ico: '🎯', txt: '目标' },
   { to: '/diary', ico: '📔', txt: '日记' },
   { to: '/knowledge', ico: '📚', txt: '知识库' },
+  { to: '/books', ico: '📖', txt: '读书' },
   { to: '/charts', ico: '📈', txt: '图谱' },
   { to: '/profile', ico: '👤', txt: '档案' },
   { to: '/data', ico: '🗄️', txt: '数据' },
@@ -76,6 +78,7 @@ export default function App() {
             <Route path="/goals" element={<Goals />} />
             <Route path="/diary" element={<Diary />} />
             <Route path="/knowledge" element={<Knowledge />} />
+            <Route path="/books" element={<Books />} />
             <Route path="/charts" element={<Charts />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/data" element={<DataCenter />} />

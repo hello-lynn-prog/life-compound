@@ -19,3 +19,18 @@ marked.use({
 export function renderMd(src: string): string {
   return marked.parse(src || '', { async: false }) as string
 }
+
+/**
+ * 行内 Markdown 渲染（预览行专用）：只解析加粗/斜体/行内代码/删除线，
+ * 不产生块级标签——用于日记时间线的单行简介，保留加粗效果又不破坏布局。
+ */
+export function renderInlineMd(src: string): string {
+  const escaped = (src || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return escaped
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+}

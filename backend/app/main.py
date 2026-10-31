@@ -15,8 +15,9 @@ from fastapi.staticfiles import StaticFiles
 
 from . import backup
 from .db import init_db
-from .routers import (achievements, data, goals, habits, journals, knowledge,
-                      notes, recurrences, reviews, search, stats, tasks)
+from .routers import (achievements, books, data, goals, habits, journals,
+                      knowledge, notes, recurrences, reviews, search, stats,
+                      tasks)
 from .security import LocalOnlyMiddleware
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -39,7 +40,7 @@ for r in (tasks.router, habits.router, journals.router, notes.router,
           knowledge.router, goals.router, goals.proj_router,
           achievements.router, achievements.skill_router,
           achievements.upload_router, reviews.router, stats.router,
-          search.router, data.router, recurrences.router):
+          search.router, data.router, recurrences.router, books.router):
     app.include_router(r)
 
 

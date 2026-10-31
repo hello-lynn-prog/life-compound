@@ -4,7 +4,7 @@
 import { useState, useRef } from 'react'
 import { draftValue, useSafeDraft } from '../useSafeDraft'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { renderMd } from '../md'
+import { renderMd, renderInlineMd } from '../md'
 import { api, prettyDate, today } from '../api'
 import { Empty, Modal, useToast, useConfirm } from '../components/ui'
 
@@ -137,7 +137,9 @@ export default function Diary() {
                   </span>
                 </h4>
                 <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.7, margin: '6px 0' }}>
-                  {(j.content || '').slice(0, 100)}{(j.content || '').length > 100 ? '…' : ''}
+                  <span dangerouslySetInnerHTML={{ __html: renderInlineMd(
+                    (j.content || '').slice(0, 100) + ((j.content || '').length > 100 ? '…' : '')
+                  ) }} />
                 </p>
                 {(j.tags || []).length > 0 && (
                   <div style={{ display: 'flex', gap: 6 }}>

@@ -20,7 +20,7 @@ BACKUP_DIR = DATA_DIR / "backups"
 DB_PATH = DATA_DIR / "life.db"
 
 # 当前 schema 版本；未来加表/加列时把这里 +1 并在 MIGRATIONS 里写迁移语句
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 def now_iso() -> str:
@@ -251,6 +251,22 @@ MIGRATIONS: dict[int, list[str]] = {
     ],
     5: [
         "ALTER TABLE achievements ADD COLUMN gallery TEXT DEFAULT '[]'",  # 作品相册（多图，JSON 数组）
+    ],
+    6: [
+        """CREATE TABLE IF NOT EXISTS books (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            author TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'reading',  -- reading 在读 / finished 读完 / wishlist 想读
+            progress INTEGER NOT NULL DEFAULT 0,     -- 阅读进度 0-100
+            rating INTEGER,                          -- 评分 1-5 星（读完可评）
+            started_date TEXT DEFAULT '',
+            finished_date TEXT DEFAULT '',
+            notes TEXT DEFAULT '',                   -- 读书笔记 / 感悟（Markdown）
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT
+        )""",
     ],
 }
 
