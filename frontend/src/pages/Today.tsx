@@ -8,7 +8,8 @@ import { api, prettyDate, today } from '../api'
 import { Empty, Modal, useToast } from '../components/ui'
 import Mascot from '../components/Mascot'
 
-interface Task { id: number; title: string; done: number; priority: number; task_date: string; goal_id: number | null; project_id: number | null; summary?: string; recurrence_id?: number | null; category?: string; estimate_min?: number | null }
+interface Task { id: number; title: string; done: number; priority: number; task_date: string; goal_id: number | null; project_id: number | null; summary?: string; recurrence_id?: number | null; category?: string; estimate_min?: number | null; knowledge_ids?: number[] }
+interface KnowledgeCard { id: number; title: string; category: string }
 
 // 任务分类分组（显示顺序即此顺序；未分类的归入最后的"✨ 其他"）
 const CATEGORIES = ['☀️ 晨间', '💪 运动', '📖 学习', '💻 开发', '🌙 晚间', '🛒 生活', '✨ 其他']
@@ -38,6 +39,7 @@ export default function Today() {
   // 任务编辑（✏️ 按钮）：标题写错了、日期放错了都能改
   const [editFor, setEditFor] = useState<Task | null>(null)
   const [editForm, setEditForm] = useState({ title: '', task_date: '', category: '', priority: 0, estimate_min: '' })
+  const [editKnowledgeIds, setEditKnowledgeIds] = useState<number[]>([]) // 关联的知识卡片
   const summaryKey=summaryFor?'life-summary-draft-'+summaryFor.id:null
   const summaryStatus=useSafeDraft(summaryKey,summaryText,async()=>{await api.put(`/api/tasks/${summaryFor!.id}`,{summary:summaryText});qc.invalidateQueries({queryKey:['tasks']})})
 
@@ -48,6 +50,7 @@ export default function Today() {
   const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
   const { data: journals } = useQuery({ queryKey: ['journals'], queryFn: () => api.get<Journal[]>(`/api/journals?date=${today()}`) })
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: () => api.get<Record<string, string>>('/api/data/settings') })
+  const { data: knowledgeCards } = useQuery({ queryKey: ['knowledge'], queryFn: () => api.get<KnowledgeCard[]>('/api/knowledge?limit=500') })
   const { data: weekLogs } = useQuery({
     queryKey: ['week-logs'],
     queryFn: () => api.get<{ habit_id: number; log_date: string }[]>(`/api/habits/logs?from_=${weekStart()}&to=${today()}`),
@@ -110,6 +113,7 @@ export default function Today() {
       category: editForm.category,
       priority: editForm.priority,
       estimate_min: editForm.estimate_min === '' ? null : Number(editForm.estimate_min),
+      knowledge_ids: editKnowledgeIds,
     }),
     onSuccess: () => {
       setEditFor(null)
@@ -225,10 +229,13 @@ export default function Today() {
                       return (
                         <div key={t.id} className={`task${t.done ? ' done' : ''}`}>
                           <button className="check" onClick={() => toggle.mutate(t.id)}>{t.done ? '✓' : ''}</button>
-                          <div className="t-title">
-                            {t.title}
-                            {t.summary ? <span title={t.summary} style={{ marginLeft: 6 }}>📝</span> : null}
-                          </div>
+                  <div className="t-title">
+                    {t.title}
+                    {t.summary ? <span title={t.summary} style={{ marginLeft: 6 }}>📝</span> : null}
+                    {(t.knowledge_ids || []).length > 0 && (
+                      <span className="t-tag green" style={{ marginLeft: 6 }} title={'关联知识：' + (t.knowledge_ids || []).map(kid => knowledgeCards?.find(k => k.id === kid)?.title || '#' + kid).join('、')}>📚 {(t.knowledge_ids || []).length}</span>
+                    )}
+                  </div>
                           {!!t.priority && <span className="t-flag">🚩</span>}
                           {t.recurrence_id ? <span className="t-flag" title="重复任务">🔁</span> : null}
                           {tag && <span className={`t-tag${proj ? ' blue' : ''}`}>{tag}</span>}
@@ -243,6 +250,7 @@ export default function Today() {
                                 priority: t.priority || 0,
                                 estimate_min: t.estimate_min == null ? '' : String(t.estimate_min),
                               })
+                              setEditKnowledgeIds(t.knowledge_ids || [])
                             }}>✏️</button>
                           <button className="t-del" title="删除" onClick={() => remove.mutate(t.id)}>✕</button>
                         </div>
@@ -401,6 +409,29 @@ export default function Today() {
               <input type="checkbox" checked={editForm.priority === 1}
                 onChange={e => setEditForm({ ...editForm, priority: e.target.checked ? 1 : 0 })} /> 🚩 重要任务
             </label>
+          </div>
+          <div className="form-row"><label>🔗 关联知识（把知识库里的学习笔记挂到这个任务上）</label>
+            {editKnowledgeIds.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {editKnowledgeIds.map(kid => {
+                  const card = knowledgeCards?.find(k => k.id === kid)
+                  return (
+                    <span key={kid} className="t-tag green" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px' }}>
+                      📚 {card ? card.title : `知识 #${kid}`}
+                      <span style={{ cursor: 'pointer', fontWeight: 'bold' }}
+                        onClick={() => setEditKnowledgeIds(ids => ids.filter(x => x !== kid))}>×</span>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+            <select className="select" value=""
+              onChange={e => { if (e.target.value) setEditKnowledgeIds(ids => [...ids, +e.target.value]) }}>
+              <option value="">＋ 添加关联知识…</option>
+              {(knowledgeCards || []).filter(k => !editKnowledgeIds.includes(k.id)).map(k => (
+                <option key={k.id} value={k.id}>#{k.id} {k.title}</option>
+              ))}
+            </select>
           </div>
           <div className="form-actions">
             <button className="btn" onClick={() => setEditFor(null)}>取消</button>

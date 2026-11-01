@@ -13,7 +13,8 @@ router = new_router("/api/tasks")
 # 允许前端提交/修改的字段白名单（recurrence_id 由后端生成实例时写入，
 # summary 是"今日总结"，category 是分类标签，都开放给通用更新）
 FIELDS = {"title", "notes", "task_date", "done", "priority", "goal_id",
-          "project_id", "estimate_min", "done_at", "summary", "category"}
+          "project_id", "estimate_min", "done_at", "summary", "category",
+          "knowledge_ids"}
 
 
 @router.get("")

@@ -20,7 +20,7 @@ BACKUP_DIR = DATA_DIR / "backups"
 DB_PATH = DATA_DIR / "life.db"
 
 # 当前 schema 版本；未来加表/加列时把这里 +1 并在 MIGRATIONS 里写迁移语句
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 def now_iso() -> str:
@@ -271,6 +271,9 @@ MIGRATIONS: dict[int, list[str]] = {
     7: [
         "ALTER TABLE books ADD COLUMN cover_path TEXT DEFAULT ''",  # 书封（网上搜索或本地上传）
     ],
+    8: [
+        "ALTER TABLE tasks ADD COLUMN knowledge_ids TEXT DEFAULT '[]'",  # 任务关联的知识卡片（JSON 数组）
+    ],
 }
 
 
@@ -296,9 +299,9 @@ def init_db() -> None:
 
 # ---------------------------------------------------------------- 通用小工具
 def row_to_dict(row: sqlite3.Row) -> dict:
-    """sqlite3.Row -> 普通 dict，并把 tags/gallery 这类 JSON 字段解析成列表"""
+    """sqlite3.Row -> 普通 dict，并把 tags/gallery/knowledge_ids 这类 JSON 字段解析成列表"""
     d = dict(row)
-    for key in ("tags", "gallery"):
+    for key in ("tags", "gallery", "knowledge_ids"):
         if key in d and isinstance(d[key], str):
             try:
                 d[key] = json.loads(d[key])
