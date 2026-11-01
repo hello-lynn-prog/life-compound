@@ -1,7 +1,8 @@
 /**
  * 目标与项目：方向 → 阶段目标 → 项目 的树状结构，各层带进度
+ * 项目可关联知识库卡片（📚），联动知识库的学习沉淀
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
 import { Empty, Modal, useToast, useConfirm } from '../components/ui'
@@ -15,7 +16,9 @@ interface Goal {
 interface Project {
   id: number; goal_id: number | null; title: string; status: string
   start_date: string; due_date: string; progress: Progress
+  knowledge_ids?: number[]
 }
+interface KnowledgeCard { id: number; title: string; category: string }
 interface Tree { directions: Goal[]; standalone_goals: Goal[] }
 
 type Editor =
@@ -36,6 +39,21 @@ export default function Goals() {
   const [due, setDue] = useState('')
 
   const { data: tree } = useQuery({ queryKey: ['goals-tree'], queryFn: () => api.get<Tree>('/api/goals/tree') })
+  // 知识库卡片（项目可关联知识）
+  const { data: knowledgeCards } = useQuery({ queryKey: ['knowledge'], queryFn: () => api.get<KnowledgeCard[]>('/api/knowledge?limit=500') })
+  const [knowledgePicker, setKnowledgePicker] = useState<Project | null>(null)
+  const [pickerSelected, setPickerSelected] = useState<number[]>([])
+  const [pickerSearch, setPickerSearch] = useState('')
+
+  const saveKnowledgeLink = useMutation({
+    mutationFn: () => api.put(`/api/projects/${knowledgePicker!.id}`, { knowledge_ids: pickerSelected }),
+    onSuccess: () => {
+      setKnowledgePicker(null)
+      toast('关联知识已更新 📚')
+      refresh()
+    },
+    onError: (e: Error) => toast(e.message),
+  })
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ['goals-tree'] }); qc.invalidateQueries({ queryKey: ['goals'] }); qc.invalidateQueries({ queryKey: ['projects'] }) }
 
@@ -74,7 +92,11 @@ export default function Goals() {
     </div>
   )
 
-  const renderProject = (p: Project) => (
+  const renderProject = (p: Project) => {
+    const linked = (p.knowledge_ids || [])
+      .map(kid => knowledgeCards?.find(k => k.id === kid))
+      .filter(Boolean) as KnowledgeCard[]
+    return (
     <div key={p.id} style={{ background: 'var(--cream)', borderRadius: 14, padding: '12px 16px', marginBottom: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
         <span>📦 {p.title}</span>
@@ -83,8 +105,20 @@ export default function Goals() {
         <button className="t-del" style={{ opacity: 1 }} onClick={() => confirm(`确定删除项目「${p.title}」吗？（会进入回收站，任务不会丢）`, () => del.mutate({ kind: 'project', id: p.id }))}>✕</button>
       </div>
       <ProgressBar p={p.progress} />
+      {linked.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+          {linked.map(k => (
+            <span key={k.id} className="t-tag green">📚 {k.title.length > 14 ? k.title.slice(0, 13) + '…' : k.title}</span>
+          ))}
+        </div>
+      )}
+      <button className="btn btn-sm btn-ghost" style={{ marginTop: 8 }}
+        onClick={() => { setKnowledgePicker(p); setPickerSelected(p.knowledge_ids || []); setPickerSearch('') }}>
+        🔗 关联知识 {linked.length > 0 ? `(${linked.length})` : ''}
+      </button>
     </div>
-  )
+    )
+  }
 
   const renderGoal = (g: Goal) => (
     <div key={g.id} style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 16, padding: '14px 18px', marginBottom: 12 }}>
@@ -159,6 +193,38 @@ export default function Goals() {
           <div className="form-actions">
             <button className="btn" onClick={() => setEditor(null)}>取消</button>
             <button className="btn btn-primary" disabled={!title.trim()} onClick={() => save.mutate()}>保存</button>
+          </div>
+        </Modal>
+      )}
+      {/* 关联知识选择器 */}
+      {knowledgePicker && (
+        <Modal title={`🔗 关联知识 · ${knowledgePicker.title}`} onClose={() => setKnowledgePicker(null)}>
+          <input className="input" placeholder="🔍 搜索知识标题…" style={{ marginBottom: 10 }}
+            value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} autoFocus />
+          <div style={{ maxHeight: '46vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {(knowledgeCards || []).filter(k => k.title.includes(pickerSearch)).map(k => {
+              const checked = pickerSelected.includes(k.id)
+              return (
+                <label key={k.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                  background: checked ? 'var(--peach-light)' : 'var(--cream)', borderRadius: 10, cursor: 'pointer',
+                }}>
+                  <input type="checkbox" checked={checked}
+                    onChange={() => setPickerSelected(ids =>
+                      checked ? ids.filter(x => x !== k.id) : [...ids, k.id])} />
+                  <span style={{ fontSize: 13, flex: 1 }}>{k.title}</span>
+                  {k.category && <span className="t-tag blue">{k.category}</span>}
+                </label>
+              )
+            })}
+            {(knowledgeCards || []).length === 0 && <Empty emoji="📚" text="知识库还是空的，先去知识库添加学习笔记" />}
+          </div>
+          <div className="form-actions">
+            <button className="btn" onClick={() => setKnowledgePicker(null)}>取消</button>
+            <button className="btn btn-primary" onClick={() => saveKnowledgeLink.mutate()}
+              disabled={saveKnowledgeLink.isPending}>
+              {saveKnowledgeLink.isPending ? '保存中…' : `保存关联（${pickerSelected.length}）`}
+            </button>
           </div>
         </Modal>
       )}

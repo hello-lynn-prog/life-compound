@@ -102,7 +102,7 @@ def delete_goal(goal_id: int, conn: sqlite3.Connection = Depends(get_db)):
 # ================================================================ 项目
 proj_router = new_router("/api/projects")
 PROJ_FIELDS = {"goal_id", "title", "description", "color", "status",
-               "start_date", "due_date", "sort"}
+               "start_date", "due_date", "sort", "knowledge_ids"}
 
 
 @proj_router.get("")

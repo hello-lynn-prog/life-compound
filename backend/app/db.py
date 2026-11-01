@@ -20,7 +20,7 @@ BACKUP_DIR = DATA_DIR / "backups"
 DB_PATH = DATA_DIR / "life.db"
 
 # 当前 schema 版本；未来加表/加列时把这里 +1 并在 MIGRATIONS 里写迁移语句
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 def now_iso() -> str:
@@ -273,6 +273,9 @@ MIGRATIONS: dict[int, list[str]] = {
     ],
     8: [
         "ALTER TABLE tasks ADD COLUMN knowledge_ids TEXT DEFAULT '[]'",  # 任务关联的知识卡片（JSON 数组）
+    ],
+    9: [
+        "ALTER TABLE projects ADD COLUMN knowledge_ids TEXT DEFAULT '[]'",  # 项目关联的知识卡片（JSON 数组）
     ],
 }
 
