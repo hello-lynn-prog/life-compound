@@ -1,7 +1,7 @@
 /**
  * 📖 读书：书架（在读/读完/想读）+ 进度条 + 读书笔记 + 年度书单
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { renderMd } from '../md'
 import { api, today } from '../api'
@@ -12,7 +12,7 @@ interface Book {
   status: 'reading' | 'finished' | 'wishlist' | string
   progress: number; rating: number | null
   started_date: string; finished_date: string
-  notes: string
+  notes: string; cover_path?: string
 }
 
 const STATUS: Record<string, { label: string; emoji: string; cls: string }> = {
@@ -40,16 +40,50 @@ export default function Books() {
   const [view, setView] = useState<Book | null>(null)
   const [form, setForm] = useState({
     title: '', author: '', status: 'reading', progress: 0,
-    rating: 0, started_date: '', finished_date: '', notes: '',
+    rating: 0, started_date: '', finished_date: '', notes: '', cover_path: '',
   })
+  // 封面：上传 / 网上搜索候选
+  const [coverSearching, setCoverSearching] = useState(false)
+  const [coverCandidates, setCoverCandidates] = useState<{ cover: string; title: string }[]>([])
+  const coverFileRef = useRef<HTMLInputElement>(null)
+
+  const uploadCover = (file: File | undefined | null) => {
+    if (!file) return
+    const fd = new FormData()
+    fd.append('file', file)
+    fetch('/api/uploads/image', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { setForm(f => ({ ...f, cover_path: j.data.url })); toast('封面已就位 🖼️') })
+      .catch(() => toast('封面上传失败'))
+  }
+  const searchCover = async () => {
+    if (!form.title.trim()) { toast('先填书名再搜封面哦'); return }
+    setCoverSearching(true); setCoverCandidates([])
+    try {
+      const j = await api.get<{ candidates: { cover: string; title: string }[]; message?: string }>(
+        `/api/books/search-cover?q=${encodeURIComponent(form.title + (form.author ? ' ' + form.author : ''))}`)
+      setCoverCandidates(j.candidates || [])
+      if (!(j.candidates || []).length) toast(j.message || '没找到候选封面，可以手动上传')
+    } catch { toast('搜索失败，可手动上传封面') }
+    finally { setCoverSearching(false) }
+  }
+  const pickCover = async (url: string) => {
+    try {
+      const j = await api.post<{ url: string }>('/api/books/save-cover', { url })
+      setForm(f => ({ ...f, cover_path: j.url }))
+      toast('封面已选定 🖼️')
+    } catch { toast('封面下载失败，换一张试试') }
+  }
 
   const { data: books } = useQuery({ queryKey: ['books'], queryFn: () => api.get<Book[]>('/api/books') })
 
   const openEditor = (b: Book | 'new') => {
-    if (b === 'new') setForm({ title: '', author: '', status: 'reading', progress: 0, rating: 0, started_date: today(), finished_date: '', notes: '' })
+    setCoverCandidates([])
+    if (b === 'new') setForm({ title: '', author: '', status: 'reading', progress: 0, rating: 0, started_date: today(), finished_date: '', notes: '', cover_path: '' })
     else setForm({
       title: b.title, author: b.author, status: b.status, progress: b.progress,
       rating: b.rating ?? 0, started_date: b.started_date, finished_date: b.finished_date, notes: b.notes || '',
+      cover_path: b.cover_path || '',
     })
     setEdit(b)
   }
@@ -104,17 +138,22 @@ export default function Books() {
     return (
       <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', cursor: 'pointer' }}
         onClick={() => setView(b)}>
-        {/* 书封 */}
-        <div style={{
-          width: 86, flexShrink: 0, background: `linear-gradient(135deg, ${cover.bg}, ${cover.spine}55)`,
-          borderRight: `4px solid ${cover.spine}`, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 4, padding: '14px 6px',
-        }}>
-          <span style={{ fontSize: 26 }}>{cover.emoji}</span>
-          <span style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--ink)', textAlign: 'center', lineHeight: 1.4 }}>
-            {b.title.slice(0, 8)}
-          </span>
-        </div>
+        {/* 书封：有真实封面用图，否则彩色书脊设计 */}
+        {b.cover_path ? (
+          <img src={b.cover_path} alt={b.title}
+            style={{ width: 96, flexShrink: 0, objectFit: 'cover', borderRight: '1px solid var(--line)' }} />
+        ) : (
+          <div style={{
+            width: 86, flexShrink: 0, background: `linear-gradient(135deg, ${cover.bg}, ${cover.spine}55)`,
+            borderRight: `4px solid ${cover.spine}`, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 4, padding: '14px 6px',
+          }}>
+            <span style={{ fontSize: 26 }}>{cover.emoji}</span>
+            <span style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--ink)', textAlign: 'center', lineHeight: 1.4 }}>
+              {b.title.slice(0, 8)}
+            </span>
+          </div>
+        )}
         {/* 信息 */}
         <div style={{ flex: 1, minWidth: 0, padding: '14px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -257,6 +296,38 @@ export default function Books() {
               </div>
             </div>
           )}
+          <div className="form-row"><label>封面（联网搜索或本地上传，可选）</label>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              {form.cover_path ? (
+                <img src={form.cover_path} alt="封面"
+                  style={{ width: 84, height: 116, objectFit: 'cover', borderRadius: 8, boxShadow: '0 4px 12px rgba(92,74,68,.15)' }} />
+              ) : (
+                <div style={{ width: 84, height: 116, borderRadius: 8, background: 'var(--cream-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>📕</div>
+              )}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-sm btn-ghost" disabled={coverSearching || !form.title.trim()}
+                    onClick={() => searchCover()}>{coverSearching ? '搜索中…' : '🔍 网上找封面'}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => coverFileRef.current?.click()}>🖼️ 上传图片</button>
+                  {form.cover_path && (
+                    <button type="button" className="btn btn-sm btn-danger" onClick={() => setForm({ ...form, cover_path: '' })}>移除</button>
+                  )}
+                  <input ref={coverFileRef} type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={e => { uploadCover(e.target.files?.[0]); e.target.value = '' }} />
+                </div>
+                {coverCandidates.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {coverCandidates.map((c, i) => (
+                      <img key={i} src={c.cover} title={c.title} alt={c.title}
+                        style={{ width: 52, height: 74, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '2px solid transparent' }}
+                        onClick={() => pickCover(c.cover)}
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="form-row"><label>读书笔记 / 感悟（Markdown，随时可补）</label>
             <textarea className="textarea" style={{ minHeight: 130 }} value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}

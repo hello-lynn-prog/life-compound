@@ -20,7 +20,7 @@ BACKUP_DIR = DATA_DIR / "backups"
 DB_PATH = DATA_DIR / "life.db"
 
 # 当前 schema 版本；未来加表/加列时把这里 +1 并在 MIGRATIONS 里写迁移语句
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 def now_iso() -> str:
@@ -267,6 +267,9 @@ MIGRATIONS: dict[int, list[str]] = {
             updated_at TEXT NOT NULL,
             deleted_at TEXT
         )""",
+    ],
+    7: [
+        "ALTER TABLE books ADD COLUMN cover_path TEXT DEFAULT ''",  # 书封（网上搜索或本地上传）
     ],
 }
 

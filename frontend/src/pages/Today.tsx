@@ -31,6 +31,8 @@ export default function Today() {
   const [goalId, setGoalId] = useState(0)
   const [projectId, setProjectId] = useState(0)
   const [quickNote, setQuickNote] = useState(() => draftValue('life-today-note-draft',''))
+  // 任务卡日期切换：默认今天，可回看昨天/前天的任务记录
+  const [viewDate, setViewDate] = useState(today())
   const [summaryFor, setSummaryFor] = useState<Task | null>(null) // 正在写总结的任务
   const [summaryText, setSummaryText] = useState('')
   // 任务编辑（✏️ 按钮）：标题写错了、日期放错了都能改
@@ -40,7 +42,7 @@ export default function Today() {
   const summaryStatus=useSafeDraft(summaryKey,summaryText,async()=>{await api.put(`/api/tasks/${summaryFor!.id}`,{summary:summaryText});qc.invalidateQueries({queryKey:['tasks']})})
 
   const { data: overview } = useQuery({ queryKey: ['overview'], queryFn: () => api.get<Overview>('/api/stats/overview') })
-  const { data: tasks } = useQuery({ queryKey: ['tasks', today()], queryFn: () => api.get<Task[]>(`/api/tasks?date=${today()}`) })
+  const { data: tasks } = useQuery({ queryKey: ['tasks', viewDate], queryFn: () => api.get<Task[]>(`/api/tasks?date=${viewDate}`) })
   const { data: habits } = useQuery({ queryKey: ['habits'], queryFn: () => api.get<Habit[]>('/api/habits') })
   const { data: goals } = useQuery({ queryKey: ['goals'], queryFn: () => api.get<Goal[]>('/api/goals') })
   const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: () => api.get<Project[]>('/api/projects') })
@@ -60,6 +62,7 @@ export default function Today() {
   const addTask = useMutation({
     mutationFn: (title: string) => {
       // 选了重复 → 建规则（今日实例由查询时自动生成）；否则建普通任务
+      // （回看过去日期时，新任务加到正在查看的那天）
       if (newRepeat !== 'none') {
         const isWeekly = newRepeat.startsWith('weekly-')
         return api.post('/api/recurrences', {
@@ -70,7 +73,7 @@ export default function Today() {
         })
       }
       return api.post('/api/tasks', {
-        title, task_date: today(), priority: newPriority ? 1 : 0,
+        title, task_date: viewDate, priority: newPriority ? 1 : 0,
         goal_id: goalId || null, project_id: projectId || null,
         category: newCategory || '',
       })
@@ -177,8 +180,21 @@ export default function Today() {
         {/* 左列 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="card">
-            <div className="card-title">🌸 今日任务
+            <div className="card-title">
+              {viewDate === today() ? '🌸 今日任务' : `🗓️ ${prettyDate(viewDate)} 的任务`}
               <span className="hint">已完成 {done} / {tasks?.length ?? 0}</span>
+              {/* 日期切换：回看过去某天的任务记录 */}
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                <button className="btn btn-sm" title="前一天"
+                  onClick={() => setViewDate(shiftDate(viewDate, -1))}>←</button>
+                <input type="date" className="input" style={{ width: 140, padding: '4px 8px', fontSize: 12 }}
+                  value={viewDate} max={today()} onChange={e => e.target.value && setViewDate(e.target.value)} />
+                <button className="btn btn-sm" title="后一天" disabled={viewDate >= today()}
+                  onClick={() => setViewDate(shiftDate(viewDate, 1))}>→</button>
+                {viewDate !== today() && (
+                  <button className="btn btn-sm btn-ghost" onClick={() => setViewDate(today())}>回今天</button>
+                )}
+              </span>
             </div>
             {tasks?.length === 0 && <Empty emoji="🌱" text="今天还没有任务，写下第一件想做的事吧" />}
             {/* 按分类分组显示；自定义分类排在最后 */}
@@ -387,6 +403,11 @@ export default function Today() {
       )}
     </div>
   )
+}
+
+/* 工具：日期 ±n 天（YYYY-MM-DD） */
+function shiftDate(dateStr: string, n: number): string {
+  return addDays(dateStr, n)
 }
 
 /* 工具：本周一的日期串 */
