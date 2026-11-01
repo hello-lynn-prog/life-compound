@@ -249,9 +249,8 @@ export default function Books() {
             {view.progress ? ` · 进度 ${view.progress}%` : ''}
           </p>
           <div className="card-title" style={{ marginBottom: 6 }}>📝 我的读书笔记</div>
-          <div className="md-preview" style={{ fontSize: 14, lineHeight: 2, minHeight: 60 }}>
-            {renderMd(view.notes || '*（还没写感悟。点右下角编辑补上吧～）*')}
-          </div>
+          <div className="md-preview" style={{ fontSize: 14, lineHeight: 2, minHeight: 60 }}
+            dangerouslySetInnerHTML={{ __html: renderMd(view.notes || '*（还没写感悟。点右下角编辑补上吧～）*') }} />
           <div className="form-actions">
             <button className="btn" onClick={() => setView(null)}>关闭</button>
             <button className="btn btn-primary" onClick={() => { openEditor(view); setView(null) }}>✏️ 编辑这本书</button>

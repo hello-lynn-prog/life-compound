@@ -3,7 +3,7 @@
  */
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { renderMd } from '../md'
+import { renderMd, renderInlineMd } from '../md'
 import { api } from '../api'
 import { Empty, Modal, useToast, useConfirm } from '../components/ui'
 
@@ -243,9 +243,10 @@ export default function Knowledge() {
                           <span style={{ fontSize: 14, fontWeight: 'bold', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
                           {c.review_count > 0 && <span className="t-tag">🔁 {c.review_count}</span>}
                         </div>
-                        <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.7, maxHeight: 66, overflow: 'hidden' }}>
-                          {(c.content || '').replace(/[#*\-`>]/g, '').slice(0, 90)}…
-                        </p>
+                        <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.7, maxHeight: 66, overflow: 'hidden' }}
+                          dangerouslySetInnerHTML={{ __html: renderInlineMd(
+                            (c.content || '').replace(/[#*`>]/g, '').slice(0, 90) + '…'
+                          ) }} />
                         {c.image_path && (
                           <img src={c.image_path} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 10, marginTop: 10 }} />
                         )}

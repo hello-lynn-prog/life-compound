@@ -221,9 +221,8 @@ export default function Diary() {
             {prettyDate(reading.journal_date)} {reading.weather}
             {(reading.tags || []).map(t => <span key={t} className="t-tag green" style={{ marginLeft: 6 }}>#{t}</span>)}
           </p>
-          <div className="md-preview" style={{ fontSize: 14, lineHeight: 2 }}>
-            {renderMd(reading.content || '（这篇日记没有正文）')}
-          </div>
+          <div className="md-preview" style={{ fontSize: 14, lineHeight: 2 }}
+            dangerouslySetInnerHTML={{ __html: renderMd(reading.content || '（这篇日记没有正文）') }} />
           <div className="form-actions">
             <button className="btn" onClick={() => setReading(null)}>关闭</button>
             <button className="btn btn-primary" onClick={() => { openEditor(reading); setReading(null) }}>✏️ 编辑这篇</button>
