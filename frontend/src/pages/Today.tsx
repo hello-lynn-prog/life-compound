@@ -52,6 +52,11 @@ export default function Today() {
     queryKey: ['week-logs'],
     queryFn: () => api.get<{ habit_id: number; log_date: string }[]>(`/api/habits/logs?from_=${weekStart()}&to=${today()}`),
   })
+  // 本周已完成的任务（周概览 = 打卡 + 完成任务一起算）
+  const { data: weekTasks } = useQuery({
+    queryKey: ['week-tasks'],
+    queryFn: () => api.get<Task[]>(`/api/tasks?from_=${weekStart()}&to=${today()}`),
+  })
 
   const refreshAll = () => {
     qc.invalidateQueries({ queryKey: ['tasks'] })
@@ -287,11 +292,14 @@ export default function Today() {
 
           {/* 本周概览 */}
           <div className="card">
-            <div className="card-title">📅 本周概览 <span className="hint">格子颜色 = 当天打卡数</span></div>
+            <div className="card-title">📅 本周概览 <span className="hint">数字 = 当天完成任务 + 打卡次数</span></div>
             <div style={{ display: 'flex', gap: 8 }}>
               {weekLabels.map((w, i) => {
                 const dateStr = addDays(weekStart(), i)
-                const n = weekLogs?.filter(l => l.log_date === dateStr).length ?? 0
+                // 统计口径：当天完成的任务 + 习惯打卡，一起算活跃度
+                const habits = weekLogs?.filter(l => l.log_date === dateStr).length ?? 0
+                const doneTasks = weekTasks?.filter(t => t.task_date === dateStr && t.done === 1).length ?? 0
+                const n = habits + doneTasks
                 const isToday = dateStr === today()
                 const isFuture = dateStr > today()
                 const cls = isFuture ? '' : n >= 3 ? 'on2' : n > 0 ? 'on' : ''
@@ -301,7 +309,7 @@ export default function Today() {
                       height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: n >= 3 ? 'var(--peach)' : n > 0 ? 'var(--peach-light)' : 'var(--cream-deep)',
                       marginBottom: 5, fontSize: 13, outline: isToday ? '2px solid var(--peach)' : 'none', outlineOffset: 2,
-                    }}>
+                    }} title={isFuture ? undefined : `任务 ${doneTasks} · 打卡 ${habits}`}>
                       {isFuture ? '·' : n > 0 ? n : ''}
                     </div>
                     周{w}
