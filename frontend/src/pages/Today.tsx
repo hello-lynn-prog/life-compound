@@ -157,6 +157,8 @@ export default function Today() {
   const greet = hour < 6 ? '夜深了' : hour < 11 ? '早上好呀' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
   const moodNow = overview?.today_mood ?? null
   const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+  // 本周概览：点击某天展开当天明细
+  const [selectedWeekDay, setSelectedWeekDay] = useState<string | null>(null)
 
   return (
     <div>
@@ -300,7 +302,7 @@ export default function Today() {
 
           {/* 本周概览 */}
           <div className="card">
-            <div className="card-title">📅 本周概览 <span className="hint">数字 = 当天完成任务 + 打卡次数</span></div>
+            <div className="card-title">📅 本周概览 <span className="hint">数字 = 当天完成任务 + 打卡次数 · 点击格子看明细</span></div>
             <div style={{ display: 'flex', gap: 8 }}>
               {weekLabels.map((w, i) => {
                 const dateStr = addDays(weekStart(), i)
@@ -311,13 +313,16 @@ export default function Today() {
                 const isToday = dateStr === today()
                 const isFuture = dateStr > today()
                 const cls = isFuture ? '' : n >= 3 ? 'on2' : n > 0 ? 'on' : ''
+                const selected = selectedWeekDay === dateStr
                 return (
-                  <div key={w} className={`w-cell ${cls}`} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'var(--ink-soft)' }}>
+                  <div key={w} className={`w-cell ${cls}`} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'var(--ink-soft)', cursor: isFuture ? 'default' : 'pointer' }}
+                    onClick={() => { if (!isFuture) setSelectedWeekDay(selected ? null : dateStr) }}>
                     <div className="cube" style={{
                       height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: n >= 3 ? 'var(--peach)' : n > 0 ? 'var(--peach-light)' : 'var(--cream-deep)',
+                      background: selected ? 'var(--peach-deep)' : n >= 3 ? 'var(--peach)' : n > 0 ? 'var(--peach-light)' : 'var(--cream-deep)',
+                      color: selected ? '#fff' : undefined,
                       marginBottom: 5, fontSize: 13, outline: isToday ? '2px solid var(--peach)' : 'none', outlineOffset: 2,
-                    }} title={isFuture ? undefined : `任务 ${doneTasks} · 打卡 ${habits}`}>
+                    }} title={isFuture ? undefined : `任务 ${doneTasks} · 打卡 ${habits}（点击看明细）`}>
                       {isFuture ? '·' : n > 0 ? n : ''}
                     </div>
                     周{w}
@@ -325,6 +330,29 @@ export default function Today() {
                 )
               })}
             </div>
+            {/* 当天明细展开 */}
+            {selectedWeekDay && (() => {
+              const doneList = (weekTasks || []).filter(t => t.task_date === selectedWeekDay && t.done === 1)
+              const habitNames = (weekLogs || [])
+                .filter(l => l.log_date === selectedWeekDay)
+                .map(l => habits?.find(h => h.id === l.habit_id)?.name || '习惯')
+              return (
+                <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '12px 16px', marginTop: 10, fontSize: 13, lineHeight: 2 }}>
+                  <b style={{ color: 'var(--peach-deep)' }}>{prettyDate(selectedWeekDay)}</b> 做了这些：
+                  {doneList.length === 0 && habitNames.length === 0 && (
+                    <span style={{ color: 'var(--ink-soft)' }}>　这天没有留下记录 🫧</span>
+                  )}
+                  {doneList.length > 0 && (
+                    <div>
+                      {doneList.map(t => <div key={t.id}>✅ {t.title}</div>)}
+                    </div>
+                  )}
+                  {habitNames.length > 0 && (
+                    <div>📌 打卡：{habitNames.join('、')}</div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
 
