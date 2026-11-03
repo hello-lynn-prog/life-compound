@@ -4,6 +4,20 @@
 
 **完全离线、无需账号、数据只存在本机**（React + TypeScript 前端 / Python FastAPI 本地服务 / SQLite）。
 
+## 界面预览
+
+| 每天打开的第一站 | 学到的东西长成图谱 |
+|---|---|
+| ![欢迎页](docs/screenshots/welcome.png) | ![知识图谱](docs/screenshots/knowledge-graph.png) |
+
+| 今日：任务 / 打卡 / 心情 / 速记 | 档案：作品墙 + 技能雷达 |
+|---|---|
+| ![今日页](docs/screenshots/today.png) | ![档案页](docs/screenshots/profile.png) |
+
+| 数据中心：备份 / 导出 / 回收站——你的数据你做主 |
+|---|
+| ![数据中心](docs/screenshots/data-center.png) |
+
 ## 快速开始
 
 | 文件 | 用途 |
