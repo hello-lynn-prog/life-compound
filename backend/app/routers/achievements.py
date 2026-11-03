@@ -14,7 +14,7 @@ from ..db import UPLOAD_DIR
 router = new_router("/api/achievements")
 
 ACH_FIELDS = {"ach_type", "title", "description", "ach_date", "link",
-              "image_path", "tags", "gallery"}
+              "image_path", "tags", "gallery", "category"}
 
 
 @router.get("")

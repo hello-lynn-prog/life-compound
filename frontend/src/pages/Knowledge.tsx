@@ -397,6 +397,8 @@ export default function Knowledge() {
 /* ================= 知识图谱视图 ================= */
 function KnowledgeGraph({ cards, onOpen }: { cards: Card[]; onOpen: (c: Card) => void }) {
   const [hover, setHover] = useState<string | null>(null)
+  // 分类聚焦：'' = 全部；选中时该分类卡片正常，其余淡化
+  const [catFilter, setCatFilter] = useState('')
   const W = 980, H = 560
   const layout = useMemo(() => forceLayout(cards, W, H), [cards])
   // 拖拽状态
@@ -474,29 +476,63 @@ function KnowledgeGraph({ cards, onOpen }: { cards: Card[]; onOpen: (c: Card) =>
 
   if (cards.length === 0) return <div className="card"><Empty emoji="🕸️" text="先添加几张卡片，图谱就会长出来～" /></div>
 
+  // 分类统计（点击条 + 色点图例共用）
+  const catStats: [string, number][] = (() => {
+    const m = new Map<string, number>()
+    cards.forEach(c => { if (c.category) m.set(c.category, (m.get(c.category) || 0) + 1) })
+    return [...m.entries()].sort((a, b) => b[1] - a[1])
+  })()
+  // 聚焦某分类时的活跃节点：该分类卡片 + 它们带过的标签
+  const focus = catFilter ? (() => {
+    const cardIds = new Set(cards.filter(c => c.category === catFilter).map(c => c.id))
+    const tagNames = new Set<string>()
+    cards.filter(c => cardIds.has(c.id)).forEach(c => (c.tags || []).forEach(t => tagNames.add(t)))
+    return { cardIds, tagNames }
+  })() : null
+  const dimmed = (n: { kind: string; label: string; card?: Card }) => {
+    if (!focus) return false
+    if (n.card) return !focus.cardIds.has(n.card.id)
+    return n.kind === 'tag' && !focus.tagNames.has(n.label.replace(/^#/, ''))
+  }
+
   const posById = new Map<string, { x: number; y: number }>()
   layout.nodes.forEach(n => posById.set(n.id, posOf(n.id, n)))
 
   return (
     <div className="card">
       <div className="card-title">🕸️ 知识图谱
-        <span className="hint">拖动圆点整理布局（自动保存）· 悬停高亮 · 点击卡片打开</span>
+        <span className="hint">拖动圆点整理布局（自动保存）· 悬停高亮 · 点击卡片打开 · 点分类聚焦</span>
       </div>
+      {catStats.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0 12px' }}>
+          <button className={`chip${catFilter === '' ? ' on' : ''}`} style={{ cursor: 'pointer' }}
+            onClick={() => setCatFilter('')}>🌈 全部</button>
+          {catStats.map(([c, n]) => (
+            <button key={c} className={`chip${catFilter === c ? ' on' : ''}`} style={{ cursor: 'pointer' }}
+              onClick={() => setCatFilter(catFilter === c ? '' : c)}>
+              <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: catColor(c), marginRight: 6, verticalAlign: 'middle', border: '1px solid rgba(59,43,36,.25)' }} />
+              {c} {n}
+            </button>
+          ))}
+        </div>
+      )}
       <div style={{ overflowX: 'auto' }}>
         <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`}
           style={{ minWidth: 760, background: 'var(--cream)', borderRadius: 14, touchAction: 'none' }}>
           {layout.edges.map(([a, b], i) => {
             const pa = posById.get(a.id)!, pb = posById.get(b.id)!
+            const lit = related && (a.id === hover || b.id === hover)
+            const faded = dimmed(a) || dimmed(b)
             return (
               <line key={i} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
-                stroke={related && (a.id === hover || b.id === hover) ? '#F87B93' : '#EBD4CB'}
-                strokeWidth={related && (a.id === hover || b.id === hover) ? 2.5 : 1.2}
-                opacity={!related || related.has(a.id) || related.has(b.id) ? 0.9 : 0.15} />
+                stroke={lit ? '#F87B93' : '#EBD4CB'}
+                strokeWidth={lit ? 2.5 : 1.2}
+                opacity={faded ? 0.06 : (!related || related.has(a.id) || related.has(b.id) ? 0.9 : 0.15)} />
             )
           })}
           {layout.nodes.map(n => {
             const p = posById.get(n.id)!
-            const dim = related && !related.has(n.id)
+            const dim = (related && !related.has(n.id)) || dimmed(n)
             return (
               <g key={n.id}
                 onPointerDown={e => {

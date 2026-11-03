@@ -11,7 +11,7 @@ import Mascot from '../components/Mascot'
 interface Achievement {
   id: number; ach_type: string; title: string; description: string
   ach_date: string; link: string; image_path: string; tags: string[]
-  gallery?: string[]
+  gallery?: string[]; category?: string
 }
 interface Skill { id: number; name: string; level: number; icon: string }
 
@@ -22,8 +22,10 @@ export default function Profile() {
   const toast = useToast()
   const { confirm, confirmNode } = useConfirm()
   const [edit, setEdit] = useState<Achievement | 'new' | null>(null)
-  const [form, setForm] = useState({ ach_type: 'work', title: '', description: '', ach_date: '', link: '' })
+  const [form, setForm] = useState({ ach_type: 'work', title: '', description: '', ach_date: '', link: '', category: '' })
+  const [workFilter, setWorkFilter] = useState('全部') // 作品墙分类筛选
   const [introOpen, setIntroOpen] = useState(false)
+  const [skillEdit, setSkillEdit] = useState<Skill | null>(null) // 点击技能 chip 修改等级
   const [lightbox, setLightbox] = useState<{ urls: string[]; idx: number } | null>(null) // 相册放大（可翻页）
   const [expandedWorks, setExpandedWorks] = useState<Set<number>>(new Set()) // 展开全部贴纸的作品
 
@@ -33,8 +35,8 @@ export default function Profile() {
   const { data: reviews } = useQuery({ queryKey: ['reviews'], queryFn: () => api.get<{ period_type: string }[]>('/api/reviews') })
 
   const openEditor = (a: Achievement | 'new') => {
-    if (a === 'new') setForm({ ach_type: 'work', title: '', description: '', ach_date: today(), link: '' })
-    else setForm({ ach_type: a.ach_type, title: a.title, description: a.description, ach_date: a.ach_date, link: a.link })
+    if (a === 'new') setForm({ ach_type: 'work', title: '', description: '', ach_date: today(), link: '', category: '' })
+    else setForm({ ach_type: a.ach_type, title: a.title, description: a.description, ach_date: a.ach_date, link: a.link, category: a.category || '' })
     setEdit(a)
   }
 
@@ -51,10 +53,22 @@ export default function Profile() {
     mutationFn: (s: { name: string; level: number }) => api.post('/api/skills', s),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['skills'] }); toast('技能已添加 ⭐') },
   })
+  const updateSkill = useMutation({
+    mutationFn: (s: { id: number; name: string; level: number; icon: string }) =>
+      api.put(`/api/skills/${s.id}`, { name: s.name, level: s.level, icon: s.icon }),
+    onSuccess: () => { setSkillEdit(null); toast('技能已更新 ⭐'); qc.invalidateQueries({ queryKey: ['skills'] }) },
+    onError: (e: Error) => toast(e.message),
+  })
+  const delSkill = useMutation({
+    mutationFn: (id: number) => api.del(`/api/skills/${id}`),
+    onSuccess: () => { setSkillEdit(null); toast('技能已移入回收站 🗑️'); qc.invalidateQueries({ queryKey: ['skills'] }) },
+  })
 
   const radarData = (skills || []).map(s => ({ skill: s.name, level: s.level }))
   const works = (achs || []).filter(a => a.ach_type === 'work')
   const milestones = (achs || []).filter(a => a.ach_type === 'milestone' || a.ach_type === 'certificate')
+  const workCategories = Array.from(new Set(works.map(w => (w.category || '').trim()).filter(Boolean)))
+  const filteredWorks = workFilter === '全部' ? works : works.filter(w => (w.category || '').trim() === workFilter)
 
   // 自我介绍卡片文案（一键复制用）
   const introText = [
@@ -96,9 +110,17 @@ export default function Profile() {
         {/* 作品墙 */}
         <div className="card">
           <div className="card-title">🖼️ 作品墙 <span className="hint">{works.length} 件作品</span></div>
+          {workCategories.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              {['全部', ...workCategories].map(c => (
+                <button key={c} className={`chip${workFilter === c ? ' on' : ''}`} style={{ cursor: 'pointer' }}
+                  onClick={() => setWorkFilter(c)}>{c === '全部' ? `🌈 ${c}` : c}</button>
+              ))}
+            </div>
+          )}
           {works.length === 0 && <Empty emoji="🖼️" text="做完一个项目、写了一篇爆文，都值得挂上墙" />}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
-            {works.map(w => {
+            {filteredWorks.map(w => {
               const album = (w.gallery && w.gallery.length ? w.gallery : w.image_path ? [w.image_path] : [])
               const COLLAPSED_N = 6
               const expanded = expandedWorks.has(w.id)
@@ -129,7 +151,8 @@ export default function Profile() {
                   <button className="t-del" style={{ opacity: 1 }} onClick={() => confirm(`确定删除「${w.title}」吗？`, () => del.mutate(w.id))}>✕</button>
                 </div>
                 {w.description && <p style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '6px 0', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{w.description.slice(0, 120)}{w.description.length > 120 ? '…' : ''}</p>}
-                <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-soft)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {w.category && <span className="t-tag">🏷️ {w.category}</span>}
                   {w.ach_date && <span>📅 {w.ach_date} </span>}
                   {w.link && <a href={w.link} target="_blank" rel="noreferrer" style={{ color: 'var(--peach-deep)' }}>🔗 打开</a>}
                 </div>
@@ -155,7 +178,8 @@ export default function Profile() {
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {(skills || []).map(s => (
-              <span key={s.id} className="chip">{s.icon} {s.name} · {s.level}</span>
+              <span key={s.id} className="chip" style={{ cursor: 'pointer' }} title="点击修改等级"
+                onClick={() => setSkillEdit(s)}>{s.icon || '⭐'} {s.name} · {s.level}</span>
             ))}
           </div>
           <SkillInput onSave={s => saveSkill.mutate(s)} />
@@ -193,6 +217,15 @@ export default function Profile() {
               ))}
             </div>
           </div>
+          <div className="form-row"><label>分类（作品用）</label>
+            <input className="input" list="ach-category-suggestions" value={form.category}
+              onChange={e => setForm({ ...form, category: e.target.value })}
+              placeholder="如：PPT / 原型图 / 提示词 / 报告模板…" />
+            <datalist id="ach-category-suggestions">
+              {['代码项目', 'PPT', '原型图', '提示词', '报告模板', 'PRD', '设计', '文章', '视频'].map(c =>
+                <option key={c} value={c} />)}
+            </datalist>
+          </div>
           <div className="form-row"><label>标题 *</label>
             <input className="input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} autoFocus placeholder="比如：人生复利系统 v1.0 上线" />
           </div>
@@ -210,6 +243,35 @@ export default function Profile() {
           <div className="form-actions">
             <button className="btn" onClick={() => setEdit(null)}>取消</button>
             <button className="btn btn-primary" disabled={!form.title.trim()} onClick={() => save.mutate()}>保存</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* 技能编辑（点击 chip 修改等级/名称/图标） */}
+      {skillEdit && (
+        <Modal title={`✏️ 修改技能 · ${skillEdit.name}`} onClose={() => setSkillEdit(null)}>
+          <div className="form-row"><label>名称</label>
+            <input className="input" value={skillEdit.name} autoFocus
+              onChange={e => setSkillEdit({ ...skillEdit, name: e.target.value })} />
+          </div>
+          <div className="form-row"><label>图标</label>
+            <input className="input" value={skillEdit.icon || ''} maxLength={4} placeholder="⭐"
+              onChange={e => setSkillEdit({ ...skillEdit, icon: e.target.value })} />
+          </div>
+          <div className="form-row"><label>等级（1-10）</label>
+            <select className="select" value={skillEdit.level}
+              onChange={e => setSkillEdit({ ...skillEdit, level: +e.target.value })}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} 级</option>)}
+            </select>
+          </div>
+          <div className="form-actions" style={{ justifyContent: 'space-between' }}>
+            <button className="btn btn-ghost"
+              onClick={() => confirm(`删除技能「${skillEdit.name}」？`, () => delSkill.mutate(skillEdit.id))}>🗑 删除</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn" onClick={() => setSkillEdit(null)}>取消</button>
+              <button className="btn btn-primary" disabled={!skillEdit.name.trim()}
+                onClick={() => updateSkill.mutate(skillEdit)}>保存</button>
+            </div>
           </div>
         </Modal>
       )}
